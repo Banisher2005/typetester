@@ -3,6 +3,7 @@
 import React, { memo, useMemo } from "react";
 import type { WPMDataPoint } from "@/lib/stats";
 import type { TestMode } from "./ModeSelector";
+import type { BestScore } from "@/lib/bestScores";
 
 interface ResultsScreenProps {
   wpm: number;
@@ -13,8 +14,11 @@ interface ResultsScreenProps {
   elapsedSeconds: number;
   wpmHistory: WPMDataPoint[];
   mode: TestMode;
+  bestScore: BestScore | null;
+  isNewBest: boolean;
   onRetry: () => void;
   onNewTest: () => void;
+  onClearBests: () => void;
 }
 
 function AccuracyGraph({ data }: { data: WPMDataPoint[] }) {
@@ -164,9 +168,11 @@ const ResultsScreen = memo(function ResultsScreen({
   incorrectChars,
   elapsedSeconds,
   wpmHistory,
-  mode,
+  bestScore,
+  isNewBest,
   onRetry,
   onNewTest,
+  onClearBests,
 }: ResultsScreenProps) {
   const displayTime = useMemo(() => {
     const s = Math.round(elapsedSeconds);
@@ -182,7 +188,20 @@ const ResultsScreen = memo(function ResultsScreen({
           {/* WPM — big */}
           <div>
             <div className="result-wpm-label">wpm</div>
-            <div className="result-wpm" id="result-wpm">{wpm}</div>
+            <div className="result-wpm-row">
+              <div className="result-wpm" id="result-wpm">{wpm}</div>
+              {isNewBest && (
+                <div className="new-best-badge" id="new-best-badge" aria-label="New personal best">
+                  🏆 new best!
+                </div>
+              )}
+            </div>
+            {/* Previous best (shown only if not a new best and there's a saved score) */}
+            {!isNewBest && bestScore && (
+              <div className="best-score-hint" id="prev-best-hint">
+                prev best: {bestScore.wpm} wpm
+              </div>
+            )}
           </div>
 
           {/* Divider */}
@@ -249,6 +268,18 @@ const ResultsScreen = memo(function ResultsScreen({
       <p className="text-center mt-4 restart-hint">
         Tab + Enter to restart · Esc to focus
       </p>
+
+      {/* Clear best scores link */}
+      <div className="text-center mt-3">
+        <button
+          id="btn-clear-bests"
+          className="clear-bests-btn"
+          onClick={onClearBests}
+          title="Clear all saved best scores"
+        >
+          clear best scores
+        </button>
+      </div>
     </div>
   );
 });

@@ -15,6 +15,10 @@
   --border: #3a3a3a;
   --tab-active: #f0c040;
   --tab-hover: #e2e2e2;
+  --warning: #f59e0b;
+  --easy-color: #4ade80;
+  --medium-color: #f0c040;
+  --hard-color: #f87171;
 }
 
 [data-theme="light"] {
@@ -32,6 +36,10 @@
   --border: #d1d5db;
   --tab-active: #d97706;
   --tab-hover: #1a1a1a;
+  --warning: #d97706;
+  --easy-color: #16a34a;
+  --medium-color: #d97706;
+  --hard-color: #dc2626;
 }
 
 * {
@@ -170,6 +178,14 @@ body {
   line-height: 1;
 }
 
+/* Mode selector stack (two rows) */
+.mode-selector-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 /* Mode selector */
 .mode-selector {
   display: flex;
@@ -179,6 +195,22 @@ body {
   border-radius: 8px;
   padding: 0.25rem;
   border: 1px solid var(--border);
+}
+
+.mode-selector-secondary {
+  opacity: 0.85;
+  transform: scale(0.97);
+}
+
+.mode-label {
+  font-family: var(--font-roboto-mono), monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 0.4rem;
+  white-space: nowrap;
 }
 
 .mode-group {
@@ -217,6 +249,27 @@ body {
   font-weight: 600;
 }
 
+/* Punctuation / Numbers icon buttons */
+.mode-btn-icon {
+  padding: 0.3rem 0.55rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+
+/* Difficulty-specific button colors when active */
+.mode-btn-difficulty-easy.active {
+  color: var(--easy-color);
+}
+
+.mode-btn-difficulty-medium.active {
+  color: var(--medium-color);
+}
+
+.mode-btn-difficulty-hard.active {
+  color: var(--hard-color);
+}
+
 /* Results screen */
 .results-container {
   animation: fadeIn 0.4s ease;
@@ -238,6 +291,12 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
+}
+
+.result-wpm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .result-wpm {
@@ -274,6 +333,65 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* 🏆 New best badge */
+.new-best-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  background: linear-gradient(135deg, #f59e0b, #f0c040, #fbbf24);
+  color: #1a1a1a;
+  border-radius: 999px;
+  font-family: var(--font-roboto-mono), monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  animation: badgePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+             badgeShimmer 2.5s ease-in-out 0.5s infinite;
+  box-shadow: 0 0 18px rgba(240, 192, 64, 0.45);
+}
+
+@keyframes badgePop {
+  0% { transform: scale(0.4) rotate(-8deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes badgeShimmer {
+  0%, 100% { box-shadow: 0 0 14px rgba(240, 192, 64, 0.4); }
+  50% { box-shadow: 0 0 28px rgba(240, 192, 64, 0.75); }
+}
+
+/* Previous best hint */
+.best-score-hint {
+  font-family: var(--font-roboto-mono), monospace;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  opacity: 0.55;
+  margin-top: 0.4rem;
+  letter-spacing: 0.02em;
+}
+
+/* Clear best scores button */
+.clear-bests-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-roboto-mono), monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.35;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.clear-bests-btn:hover {
   opacity: 0.7;
 }
 
@@ -328,6 +446,7 @@ body {
   transition: box-shadow 0.2s ease;
   padding: 1rem;
   margin: -1rem;
+  position: relative;
 }
 
 .typing-area:focus-within {
@@ -336,7 +455,7 @@ body {
   border-radius: 8px;
 }
 
-/* Theme toggle */
+/* Theme toggle / Sound toggle */
 .theme-toggle {
   width: 36px;
   height: 36px;
@@ -396,4 +515,38 @@ body {
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
+}
+
+/* ── Caps Lock Warning ───────────────────────────────────────────────── */
+.caps-lock-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  position: absolute;
+  top: -2.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  background: var(--warning);
+  color: #1a1a1a;
+  font-family: var(--font-roboto-mono), monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.35);
+  z-index: 10;
+}
+
+.caps-lock-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.caps-lock-icon {
+  font-size: 0.9rem;
 }

@@ -7,12 +7,25 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import ModeSelector, { TestMode, TimeOption, WordOption } from "./ModeSelector";
+import ModeSelector, {
+  TestMode,
+  TimeOption,
+  WordOption,
+  DifficultyLevel,
+} from "./ModeSelector";
 import WordDisplay, { WordData } from "./WordDisplay";
 import StatsBar from "./StatsBar";
 import ResultsScreen from "./ResultsScreen";
+import CapsLockWarning from "./CapsLockWarning";
 import { getWords } from "@/lib/words";
 import { calcWPM, calcRawWPM, calcAccuracy, WPMDataPoint } from "@/lib/stats";
+import { SoundManager } from "@/lib/sounds";
+import {
+  getBestScore,
+  saveBestScore,
+  clearBestScores,
+  BestScore,
+} from "@/lib/bestScores";
 
 type TestPhase = "idle" | "running" | "finished";
 
@@ -31,9 +44,15 @@ export default function TypingTest() {
   const [testMode, setTestMode] = useState<TestMode>("time");
   const [timeOption, setTimeOption] = useState<TimeOption>(60);
   const [wordOption, setWordOption] = useState<WordOption>(50);
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>("medium");
+  const [punctuation, setPunctuation] = useState(false);
+  const [numbers, setNumbers] = useState(false);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  // ── Sound ─────────────────────────────────────────────────────────────────
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // ── Test state ────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<TestPhase>("idle");
@@ -58,6 +77,10 @@ export default function TypingTest() {
     incorrectChars: 0,
     elapsedSeconds: 0,
   });
+
+  // ── Best score state ──────────────────────────────────────────────────────
+  const [bestScore, setBestScore] = useState<BestScore | null>(null);
+  const [isNewBest, setIsNewBest] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,11 +109,35 @@ export default function TypingTest() {
     localStorage.setItem("typetester-theme", theme);
   }, [theme]);
 
+  // ── Sound init ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem("typetester-sound");
+    if (saved === "off") {
+      setSoundEnabled(false);
+      SoundManager.setEnabled(false);
+    }
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      SoundManager.setEnabled(next);
+      localStorage.setItem("typetester-sound", next ? "on" : "off");
+      return next;
+    });
+  }, []);
+
   // ── Generate words ────────────────────────────────────────────────────────
   const generateWords = useCallback(
-    (mode: TestMode, wOption: WordOption) => {
+    (
+      mode: TestMode,
+      wOption: WordOption,
+      diff: DifficultyLevel,
+      punct: boolean,
+      nums: boolean
+    ) => {
       const count = mode === "time" ? WORD_COUNT_FOR_TIME_MODE : wOption;
-      const raw = getWords(count);
+      const raw = getWords(count, diff, punct, nums);
       return buildWordData(raw);
     },
     []
@@ -108,7 +155,7 @@ export default function TypingTest() {
             typed: "",
             state: (i === 0 ? "current" : "upcoming") as WordData["state"],
           }))
-        : generateWords(testMode, wordOption);
+        : generateWords(testMode, wordOption, difficulty, punctuation, numbers);
 
       correctCharsRef.current = 0;
       totalCharsRef.current = 0;
@@ -125,16 +172,17 @@ export default function TypingTest() {
       setTimeLeft(timeOption);
       setWpmHistory([]);
       setLiveWpm(0);
+      setIsNewBest(false);
       setPhase("idle");
 
       setTimeout(() => inputRef.current?.focus(), 50);
     },
-    [testMode, wordOption, timeOption, generateWords]
+    [testMode, wordOption, timeOption, difficulty, punctuation, numbers, generateWords]
   );
 
   // Initial load
   useEffect(() => {
-    const initial = generateWords("time", 50);
+    const initial = generateWords("time", 50, "medium", false, false);
     setWords(initial);
     setTimeLeft(60);
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -155,10 +203,52 @@ export default function TypingTest() {
     const rawWpm = calcRawWPM(total, elapsed);
     const accuracy = calcAccuracy(correct, total);
 
-    setFinalStats({ wpm, rawWpm, accuracy, correctChars: correct, incorrectChars: Math.max(0, incorrect), elapsedSeconds: elapsed });
+    setFinalStats({
+      wpm,
+      rawWpm,
+      accuracy,
+      correctChars: correct,
+      incorrectChars: Math.max(0, incorrect),
+      elapsedSeconds: elapsed,
+    });
     setWpmHistory([...wpmHistoryRef.current]);
     setPhase("finished");
+
+    // Sound
+    SoundManager.playFinish();
+
+    // Best score — read current mode/option from closure
+    // (these are stable at time of finish call)
   }, []);
+
+  // We need testMode/timeOption/wordOption when finish is called —
+  // use a ref to avoid stale closures
+  const testModeRef = useRef(testMode);
+  const timeOptionRef = useRef(timeOption);
+  const wordOptionRef = useRef(wordOption);
+  useEffect(() => { testModeRef.current = testMode; }, [testMode]);
+  useEffect(() => { timeOptionRef.current = timeOption; }, [timeOption]);
+  useEffect(() => { wordOptionRef.current = wordOption; }, [wordOption]);
+
+  // Persist best score + load prev best when phase changes to finished
+  useEffect(() => {
+    if (phase !== "finished") return;
+
+    const mode = testModeRef.current;
+    const option = mode === "time" ? timeOptionRef.current : wordOptionRef.current;
+
+    const prevBest = getBestScore(mode, option);
+    setBestScore(prevBest);
+
+    const newBest = saveBestScore(mode, option, finalStats.wpm, finalStats.accuracy);
+    setIsNewBest(newBest);
+
+    // Update displayed bestScore to the new value if it's a new best
+    if (newBest) {
+      setBestScore({ wpm: finalStats.wpm, accuracy: finalStats.accuracy, date: new Date().toISOString() });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // ── Timer logic ───────────────────────────────────────────────────────────
   const startTimer = useCallback(() => {
@@ -333,7 +423,7 @@ export default function TypingTest() {
 
       if (e.key === " ") return; // handled in onChange
 
-      // Single printable char: count it
+      // Single printable char: count it + play sound
       if (e.key.length === 1) {
         const wordTarget = wordsRef.current[currentWordIndex]?.word ?? "";
         const typedSoFar = currentInput;
@@ -341,7 +431,12 @@ export default function TypingTest() {
         const isCorrect = e.key === wordTarget[pos];
 
         totalCharsRef.current += 1;
-        if (isCorrect) correctCharsRef.current += 1;
+        if (isCorrect) {
+          correctCharsRef.current += 1;
+          SoundManager.playCorrect();
+        } else {
+          SoundManager.playIncorrect();
+        }
         setTotalChars(totalCharsRef.current);
         setCorrectChars(correctCharsRef.current);
       }
@@ -375,6 +470,34 @@ export default function TypingTest() {
     [resetTest]
   );
 
+  const handleDifficultyChange = useCallback(
+    (d: DifficultyLevel) => {
+      setDifficulty(d);
+      setTimeout(() => resetTest(false), 0);
+    },
+    [resetTest]
+  );
+
+  const handlePunctuationToggle = useCallback(() => {
+    setPunctuation((prev) => {
+      setTimeout(() => resetTest(false), 0);
+      return !prev;
+    });
+  }, [resetTest]);
+
+  const handleNumbersToggle = useCallback(() => {
+    setNumbers((prev) => {
+      setTimeout(() => resetTest(false), 0);
+      return !prev;
+    });
+  }, [resetTest]);
+
+  const handleClearBests = useCallback(() => {
+    clearBestScores();
+    setBestScore(null);
+    setIsNewBest(false);
+  }, []);
+
   // ── Clicking the word display focuses the input ───────────────────────────
   const handleDisplayClick = useCallback(() => {
     inputRef.current?.focus();
@@ -399,15 +522,28 @@ export default function TypingTest() {
         <span className="app-logo" aria-label="TypeTester">
           typetester
         </span>
-        <button
-          id="theme-toggle"
-          className="theme-toggle"
-          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-          aria-label="Toggle theme"
-          title="Toggle light/dark theme"
-        >
-          {theme === "dark" ? "☀️" : "🌙"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Sound toggle */}
+          <button
+            id="sound-toggle"
+            className="theme-toggle"
+            onClick={toggleSound}
+            aria-label={soundEnabled ? "Mute sounds" : "Enable sounds"}
+            title={soundEnabled ? "Mute sounds" : "Enable sounds"}
+          >
+            {soundEnabled ? "🔊" : "🔇"}
+          </button>
+          {/* Theme toggle */}
+          <button
+            id="theme-toggle"
+            className="theme-toggle"
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            aria-label="Toggle theme"
+            title="Toggle light/dark theme"
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+        </div>
       </div>
 
       {/* Mode selector — hidden during results */}
@@ -417,9 +553,15 @@ export default function TypingTest() {
             mode={testMode}
             timeOption={timeOption}
             wordOption={wordOption}
+            difficulty={difficulty}
+            punctuation={punctuation}
+            numbers={numbers}
             onModeChange={handleModeChange}
             onTimeChange={handleTimeChange}
             onWordChange={handleWordChange}
+            onDifficultyChange={handleDifficultyChange}
+            onPunctuationToggle={handlePunctuationToggle}
+            onNumbersToggle={handleNumbersToggle}
             disabled={phase === "running"}
           />
         </div>
@@ -436,8 +578,11 @@ export default function TypingTest() {
           elapsedSeconds={finalStats.elapsedSeconds}
           wpmHistory={wpmHistory}
           mode={testMode}
+          bestScore={bestScore}
+          isNewBest={isNewBest}
           onRetry={() => resetTest(true)}
           onNewTest={() => resetTest(false)}
+          onClearBests={handleClearBests}
         />
       ) : (
         <>
@@ -459,6 +604,9 @@ export default function TypingTest() {
             onClick={handleDisplayClick}
             id="typing-area"
           >
+            {/* Caps Lock Warning */}
+            <CapsLockWarning inputRef={inputRef} />
+
             {/* Hidden input */}
             <input
               ref={inputRef}
