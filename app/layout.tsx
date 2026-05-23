@@ -9,9 +9,9 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TypeRacer — Typing Speed Test",
+  title: "TypeTester — Typing Speed Test",
   description:
-    "Test your typing speed with TypeRacer — a MonkeyType-style typing speed test. Measure WPM, accuracy, and improve your typing skills.",
+    "Test your typing speed with TypeTester — a MonkeyType-style typing speed test. Measure WPM, accuracy, and improve your typing skills.",
   keywords: ["typing test", "WPM", "words per minute", "typing speed", "monkeytype"],
 };
 

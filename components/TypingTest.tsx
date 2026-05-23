@@ -77,13 +77,13 @@ export default function TypingTest() {
 
   // ── Theme init ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const saved = localStorage.getItem("typeracer-theme") as "dark" | "light" | null;
+    const saved = localStorage.getItem("typetester-theme") as "dark" | "light" | null;
     if (saved) setTheme(saved);
   }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("typeracer-theme", theme);
+    localStorage.setItem("typetester-theme", theme);
   }, [theme]);
 
   // ── Generate words ────────────────────────────────────────────────────────
@@ -392,12 +392,12 @@ export default function TypingTest() {
     <div
       className="w-full"
       style={{ maxWidth: "900px" }}
-      id="typeracer-app"
+      id="typetester-app"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <span className="app-logo" aria-label="TypeRacer">
-          typeracer
+        <span className="app-logo" aria-label="TypeTester">
+          typetester
         </span>
         <button
           id="theme-toggle"

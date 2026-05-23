@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⌨️ TypeRacer
+# ⌨️ TypeTester
 
 **A minimalist, MonkeyType-style typing speed test — built with Next.js, TypeScript & Tailwind CSS.**
 
@@ -18,7 +18,7 @@
 
 | Dark Mode | Results Screen |
 |-----------|---------------|
-| ![Dark Mode](https://placehold.co/480x260/1a1a1a/f0c040?text=TypeRacer+Dark) | ![Results](https://placehold.co/480x260/242424/4caf50?text=Results+%E2%80%94+WPM+%2B+Graph) |
+| ![Dark Mode](https://placehold.co/480x260/1a1a1a/f0c040?text=TypeTester+Dark) | ![Results](https://placehold.co/480x260/242424/4caf50?text=Results+%E2%80%94+WPM+%2B+Graph) |
 
 > **No login. No sign-up. No account.** Open the app and start typing.
 
@@ -88,7 +88,7 @@ No `vercel.json` needed. No environment variables. It just works.
 ## 🗂️ Project Structure
 
 ```
-typeracer/
+typetester/
 ├── app/
 │   ├── layout.tsx          # Root layout — Roboto Mono font, meta tags
 │   ├── page.tsx            # Entry page — renders <TypingTest />
@@ -148,7 +148,7 @@ The WPM graph records one data point per second tick and renders as an SVG `<pol
 | Incorrect | `#f44336` | `#c62828` |
 | Cursor / Accent | `#f0c040` | `#d97706` |
 
-Theme preference is saved in `localStorage` under the key `typeracer-theme`.
+Theme preference is saved in `localStorage` under the key `typetester-theme`.
 
 ---
 
