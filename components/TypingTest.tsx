@@ -17,6 +17,7 @@ import WordDisplay, { WordData } from "./WordDisplay";
 import StatsBar from "./StatsBar";
 import ResultsScreen from "./ResultsScreen";
 import CapsLockWarning from "./CapsLockWarning";
+import ThemePicker, { THEMES } from "./ThemePicker";
 import { getWords } from "@/lib/words";
 import { calcWPM, calcRawWPM, calcAccuracy, WPMDataPoint } from "@/lib/stats";
 import { SoundManager } from "@/lib/sounds";
@@ -49,7 +50,7 @@ export default function TypingTest() {
   const [numbers, setNumbers] = useState(false);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState("dark");
 
   // ── Sound ─────────────────────────────────────────────────────────────────
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -114,14 +115,31 @@ export default function TypingTest() {
 
   // ── Theme init ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const saved = localStorage.getItem("typetester-theme") as "dark" | "light" | null;
-    if (saved) setTheme(saved);
+    const saved = localStorage.getItem("typetester-theme");
+    if (saved && THEMES.some((t) => t.id === saved)) {
+      setTheme(saved);
+    }
   }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("typetester-theme", theme);
   }, [theme]);
+
+  // Helper to check if current theme is a dark theme
+  const isDarkTheme = useMemo(() => {
+    const t = THEMES.find((th) => th.id === theme);
+    return !t || theme !== "light" && theme !== "cream";
+  }, [theme]);
+
+  // Quick dark/light toggle: cycles between current dark↔light pair
+  const toggleDarkLight = useCallback(() => {
+    if (isDarkTheme) {
+      setTheme("light");
+    } else {
+      setTheme("dark");
+    }
+  }, [isDarkTheme]);
 
   // ── Sound init ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -158,7 +176,6 @@ export default function TypingTest() {
   );
 
   // ── Initialize / reset ────────────────────────────────────────────────────
-  // Reads from refs so it always uses the latest config values
   const resetTest = useCallback(
     (keepWords = false) => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -166,17 +183,17 @@ export default function TypingTest() {
 
       const newWords = keepWords
         ? wordsRef.current.map((w, i) => ({
-          ...w,
-          typed: "",
-          state: (i === 0 ? "current" : "upcoming") as WordData["state"],
-        }))
+            ...w,
+            typed: "",
+            state: (i === 0 ? "current" : "upcoming") as WordData["state"],
+          }))
         : generateWords(
-          testModeRef.current,
-          wordOptionRef.current,
-          difficultyRef.current,
-          punctuationRef.current,
-          numbersRef.current
-        );
+            testModeRef.current,
+            wordOptionRef.current,
+            difficultyRef.current,
+            punctuationRef.current,
+            numbersRef.current
+          );
 
       correctCharsRef.current = 0;
       totalCharsRef.current = 0;
@@ -235,11 +252,10 @@ export default function TypingTest() {
     setWpmHistory([...wpmHistoryRef.current]);
     setPhase("finished");
 
-    // Sound
     SoundManager.playFinish();
   }, []);
 
-  // Persist best score + load prev best when phase changes to finished
+  // Persist best score
   useEffect(() => {
     if (phase !== "finished") return;
 
@@ -252,7 +268,6 @@ export default function TypingTest() {
     const newBest = saveBestScore(mode, option, finalStats.wpm, finalStats.accuracy);
     setIsNewBest(newBest);
 
-    // Update displayed bestScore to the new value if it's a new best
     if (newBest) {
       setBestScore({ wpm: finalStats.wpm, accuracy: finalStats.accuracy, date: new Date().toISOString() });
     }
@@ -260,7 +275,6 @@ export default function TypingTest() {
   }, [phase]);
 
   // ── Timer logic ───────────────────────────────────────────────────────────
-  // Also reads from refs to avoid stale closures
   const startTimer = useCallback(() => {
     startTimeRef.current = Date.now();
 
@@ -275,7 +289,6 @@ export default function TypingTest() {
       const wpm = calcWPM(correctCharsRef.current, elapsed);
       const rawWpm = calcRawWPM(totalCharsRef.current, elapsed);
 
-      // Record WPM history once per second
       if (wpmHistoryRef.current.length === 0 || wpmHistoryRef.current[wpmHistoryRef.current.length - 1].second < second) {
         wpmHistoryRef.current.push({ second, wpm, rawWpm });
       }
@@ -339,14 +352,12 @@ export default function TypingTest() {
 
       const val = e.target.value;
 
-      // Start timer on first keystroke
       if (phaseRef.current === "idle" && val.length > 0) {
         setPhase("running");
         phaseRef.current = "running";
         startTimer();
       }
 
-      // Space pressed — advance word
       if (val.endsWith(" ")) {
         const typed = val.trimEnd();
         if (typed.length === 0) {
@@ -356,21 +367,18 @@ export default function TypingTest() {
 
         const nextIdx = currentWordIndex + 1;
 
-        // Count chars for this word submission
         const wordTarget = wordsRef.current[currentWordIndex]?.word ?? "";
         let wordCorrect = 0;
         const maxLen = Math.max(typed.length, wordTarget.length);
         for (let i = 0; i < maxLen; i++) {
           if (typed[i] === wordTarget[i]) wordCorrect++;
         }
-        // Space itself counts as a char (correct if we advance)
-        const wordTotal = typed.length + 1; // +1 for space
+        const wordTotal = typed.length + 1;
         correctCharsRef.current += wordCorrect;
         totalCharsRef.current += wordTotal;
         setCorrectChars(correctCharsRef.current);
         setTotalChars(totalCharsRef.current);
 
-        // Update word state
         setWords((prev) => {
           const updated = [...prev];
           updated[currentWordIndex] = {
@@ -388,7 +396,6 @@ export default function TypingTest() {
         setCurrentWordIndex(nextIdx);
         setCurrentInput("");
 
-        // Words mode: check if finished
         if (testModeRef.current === "words" && nextIdx >= wordOptionRef.current) {
           elapsedRef.current = startTimeRef.current
             ? (Date.now() - startTimeRef.current) / 1000
@@ -399,24 +406,20 @@ export default function TypingTest() {
         return;
       }
 
-      // Backspace — don't allow going back to previous word, just update current
       setCurrentInput(val);
     },
     [currentWordIndex, startTimer, finishTest]
   );
 
-  // Track chars for live accuracy on non-space keystrokes
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (phaseRef.current === "finished") return;
 
-      // Prevent Tab default (handled globally)
       if (e.key === "Tab") {
         e.preventDefault();
         return;
       }
 
-      // Don't track backspace or modifier keys
       if (
         e.key === "Backspace" ||
         e.key === "Shift" ||
@@ -431,9 +434,8 @@ export default function TypingTest() {
       )
         return;
 
-      if (e.key === " ") return; // handled in onChange
+      if (e.key === " ") return;
 
-      // Single printable char: count it + play sound
       if (e.key.length === 1) {
         const wordTarget = wordsRef.current[currentWordIndex]?.word ?? "";
         const typedSoFar = currentInput;
@@ -455,9 +457,6 @@ export default function TypingTest() {
   );
 
   // ── Mode change handlers ──────────────────────────────────────────────────
-  // Each handler updates both the state AND the ref immediately,
-  // then calls resetTest which reads from refs — no stale closures.
-
   const handleModeChange = useCallback(
     (mode: TestMode) => {
       setTestMode(mode);
@@ -515,57 +514,59 @@ export default function TypingTest() {
     setIsNewBest(false);
   }, []);
 
-  // ── Clicking the word display focuses the input ───────────────────────────
   const handleDisplayClick = useCallback(() => {
     inputRef.current?.focus();
   }, []);
 
-  // ── Clean up on unmount ───────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
+  const isRunning = phase === "running";
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
-      className="w-full"
+      className={`w-full ${isRunning ? "tt-focused" : ""}`}
       style={{ maxWidth: "900px" }}
       id="typetester-app"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      {/* Header — logo left, controls right */}
+      <div className={`flex items-center justify-between mb-8 tt-fade`}>
         <span className="app-logo" aria-label="TypeTester">
           typetester
         </span>
-        <div className="flex items-center gap-2">
+        <div className="header-controls">
           {/* Sound toggle */}
           <button
             id="sound-toggle"
-            className="theme-toggle"
+            className="header-btn"
             onClick={toggleSound}
             aria-label={soundEnabled ? "Mute sounds" : "Enable sounds"}
             title={soundEnabled ? "Mute sounds" : "Enable sounds"}
           >
             {soundEnabled ? "🔊" : "🔇"}
           </button>
-          {/* Theme toggle */}
+          {/* Dark/Light quick toggle */}
           <button
             id="theme-toggle"
-            className="theme-toggle"
-            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-            aria-label="Toggle theme"
-            title="Toggle light/dark theme"
+            className="header-btn"
+            onClick={toggleDarkLight}
+            aria-label="Toggle dark/light"
+            title="Toggle dark/light"
           >
-            {theme === "dark" ? "☀️" : "🌙"}
+            {isDarkTheme ? "☀️" : "🌙"}
           </button>
+          {/* Color theme picker */}
+          <ThemePicker currentTheme={theme} onThemeChange={setTheme} />
         </div>
       </div>
 
-      {/* Mode selector — hidden during results */}
+      {/* Mode selector — fades during typing */}
       {phase !== "finished" && (
-        <div className="mb-6 flex justify-center">
+        <div className="mb-6 flex justify-center tt-fade">
           <ModeSelector
             mode={testMode}
             timeOption={timeOption}
@@ -579,13 +580,12 @@ export default function TypingTest() {
             onDifficultyChange={handleDifficultyChange}
             onPunctuationToggle={handlePunctuationToggle}
             onNumbersToggle={handleNumbersToggle}
-            disabled={phase === "running"}
+            disabled={isRunning}
           />
         </div>
       )}
 
       {phase === "finished" ? (
-        /* Results */
         <ResultsScreen
           wpm={finalStats.wpm}
           rawWpm={finalStats.rawWpm}
@@ -603,28 +603,26 @@ export default function TypingTest() {
         />
       ) : (
         <>
-          {/* Live stats bar */}
-          <div className="mb-5 flex justify-center">
+          {/* Live stats — softly dims during focus */}
+          <div className={`mb-5 flex justify-center ${isRunning ? "tt-fade-soft" : ""}`}>
             <StatsBar
               liveWpm={liveWpm}
               accuracy={liveAccuracy}
               mode={testMode}
               timeLeft={Math.ceil(timeLeft)}
               wordsLeft={wordsLeft}
-              isRunning={phase === "running"}
+              isRunning={isRunning}
             />
           </div>
 
-          {/* Typing area */}
+          {/* Typing area — always visible */}
           <div
-            className={`typing-area ${phase === "running" ? "typing-active" : ""}`}
+            className={`typing-area ${isRunning ? "typing-active" : ""}`}
             onClick={handleDisplayClick}
             id="typing-area"
           >
-            {/* Caps Lock Warning */}
             <CapsLockWarning inputRef={inputRef} />
 
-            {/* Hidden input */}
             <input
               ref={inputRef}
               id="hidden-input"
@@ -641,7 +639,6 @@ export default function TypingTest() {
               tabIndex={0}
             />
 
-            {/* Word display */}
             <WordDisplay
               words={words}
               currentWordIndex={currentWordIndex}
@@ -649,14 +646,14 @@ export default function TypingTest() {
             />
           </div>
 
-          {/* Restart hint */}
+          {/* Hints — fade during focus */}
           {phase === "idle" && (
-            <p className="text-center mt-6 restart-hint">
+            <p className="text-center mt-6 restart-hint tt-fade">
               Start typing to begin · Tab + Enter to restart · Esc to focus
             </p>
           )}
-          {phase === "running" && testMode === "time" && (
-            <p className="text-center mt-4 restart-hint">
+          {isRunning && testMode === "time" && (
+            <p className="text-center mt-4 restart-hint tt-fade">
               Tab + Enter to restart
             </p>
           )}
