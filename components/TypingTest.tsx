@@ -94,9 +94,23 @@ export default function TypingTest() {
   const phaseRef = useRef<TestPhase>("idle");
   const wordsRef = useRef<WordData[]>([]);
 
-  // Keep refs in sync
+  // ── Config refs (always up-to-date, no stale closures) ────────────────────
+  const testModeRef = useRef<TestMode>(testMode);
+  const timeOptionRef = useRef<TimeOption>(timeOption);
+  const wordOptionRef = useRef<WordOption>(wordOption);
+  const difficultyRef = useRef<DifficultyLevel>(difficulty);
+  const punctuationRef = useRef(punctuation);
+  const numbersRef = useRef(numbers);
+
+  // Keep ALL refs in sync with state
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { wordsRef.current = words; }, [words]);
+  useEffect(() => { testModeRef.current = testMode; }, [testMode]);
+  useEffect(() => { timeOptionRef.current = timeOption; }, [timeOption]);
+  useEffect(() => { wordOptionRef.current = wordOption; }, [wordOption]);
+  useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
+  useEffect(() => { punctuationRef.current = punctuation; }, [punctuation]);
+  useEffect(() => { numbersRef.current = numbers; }, [numbers]);
 
   // ── Theme init ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -144,6 +158,7 @@ export default function TypingTest() {
   );
 
   // ── Initialize / reset ────────────────────────────────────────────────────
+  // Reads from refs so it always uses the latest config values
   const resetTest = useCallback(
     (keepWords = false) => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -151,11 +166,17 @@ export default function TypingTest() {
 
       const newWords = keepWords
         ? wordsRef.current.map((w, i) => ({
-            ...w,
-            typed: "",
-            state: (i === 0 ? "current" : "upcoming") as WordData["state"],
-          }))
-        : generateWords(testMode, wordOption, difficulty, punctuation, numbers);
+          ...w,
+          typed: "",
+          state: (i === 0 ? "current" : "upcoming") as WordData["state"],
+        }))
+        : generateWords(
+          testModeRef.current,
+          wordOptionRef.current,
+          difficultyRef.current,
+          punctuationRef.current,
+          numbersRef.current
+        );
 
       correctCharsRef.current = 0;
       totalCharsRef.current = 0;
@@ -169,7 +190,7 @@ export default function TypingTest() {
       setCorrectChars(0);
       setTotalChars(0);
       setElapsedSeconds(0);
-      setTimeLeft(timeOption);
+      setTimeLeft(timeOptionRef.current);
       setWpmHistory([]);
       setLiveWpm(0);
       setIsNewBest(false);
@@ -177,7 +198,7 @@ export default function TypingTest() {
 
       setTimeout(() => inputRef.current?.focus(), 50);
     },
-    [testMode, wordOption, timeOption, difficulty, punctuation, numbers, generateWords]
+    [generateWords]
   );
 
   // Initial load
@@ -216,19 +237,7 @@ export default function TypingTest() {
 
     // Sound
     SoundManager.playFinish();
-
-    // Best score — read current mode/option from closure
-    // (these are stable at time of finish call)
   }, []);
-
-  // We need testMode/timeOption/wordOption when finish is called —
-  // use a ref to avoid stale closures
-  const testModeRef = useRef(testMode);
-  const timeOptionRef = useRef(timeOption);
-  const wordOptionRef = useRef(wordOption);
-  useEffect(() => { testModeRef.current = testMode; }, [testMode]);
-  useEffect(() => { timeOptionRef.current = timeOption; }, [timeOption]);
-  useEffect(() => { wordOptionRef.current = wordOption; }, [wordOption]);
 
   // Persist best score + load prev best when phase changes to finished
   useEffect(() => {
@@ -247,10 +256,11 @@ export default function TypingTest() {
     if (newBest) {
       setBestScore({ wpm: finalStats.wpm, accuracy: finalStats.accuracy, date: new Date().toISOString() });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   // ── Timer logic ───────────────────────────────────────────────────────────
+  // Also reads from refs to avoid stale closures
   const startTimer = useCallback(() => {
     startTimeRef.current = Date.now();
 
@@ -274,8 +284,8 @@ export default function TypingTest() {
       setElapsedSeconds(elapsed);
 
       if (phaseRef.current === "running") {
-        if (testMode === "time") {
-          const remaining = Math.max(0, timeOption - elapsed);
+        if (testModeRef.current === "time") {
+          const remaining = Math.max(0, timeOptionRef.current - elapsed);
           setTimeLeft(Math.ceil(remaining));
           if (remaining <= 0) {
             finishTest();
@@ -283,7 +293,7 @@ export default function TypingTest() {
         }
       }
     }, 250);
-  }, [testMode, timeOption, finishTest]);
+  }, [finishTest]);
 
   // ── Keyboard shortcut handler ─────────────────────────────────────────────
   useEffect(() => {
@@ -379,7 +389,7 @@ export default function TypingTest() {
         setCurrentInput("");
 
         // Words mode: check if finished
-        if (testMode === "words" && nextIdx >= wordOption) {
+        if (testModeRef.current === "words" && nextIdx >= wordOptionRef.current) {
           elapsedRef.current = startTimeRef.current
             ? (Date.now() - startTimeRef.current) / 1000
             : 0;
@@ -392,7 +402,7 @@ export default function TypingTest() {
       // Backspace — don't allow going back to previous word, just update current
       setCurrentInput(val);
     },
-    [currentWordIndex, testMode, wordOption, startTimer, finishTest]
+    [currentWordIndex, startTimer, finishTest]
   );
 
   // Track chars for live accuracy on non-space keystrokes
@@ -444,11 +454,15 @@ export default function TypingTest() {
     [currentWordIndex, currentInput]
   );
 
-  // ── Mode change resets test ───────────────────────────────────────────────
+  // ── Mode change handlers ──────────────────────────────────────────────────
+  // Each handler updates both the state AND the ref immediately,
+  // then calls resetTest which reads from refs — no stale closures.
+
   const handleModeChange = useCallback(
     (mode: TestMode) => {
       setTestMode(mode);
-      setTimeout(() => resetTest(false), 0);
+      testModeRef.current = mode;
+      resetTest(false);
     },
     [resetTest]
   );
@@ -456,8 +470,9 @@ export default function TypingTest() {
   const handleTimeChange = useCallback(
     (t: TimeOption) => {
       setTimeOption(t);
+      timeOptionRef.current = t;
       setTimeLeft(t);
-      setTimeout(() => resetTest(false), 0);
+      resetTest(false);
     },
     [resetTest]
   );
@@ -465,7 +480,8 @@ export default function TypingTest() {
   const handleWordChange = useCallback(
     (w: WordOption) => {
       setWordOption(w);
-      setTimeout(() => resetTest(false), 0);
+      wordOptionRef.current = w;
+      resetTest(false);
     },
     [resetTest]
   );
@@ -473,23 +489,24 @@ export default function TypingTest() {
   const handleDifficultyChange = useCallback(
     (d: DifficultyLevel) => {
       setDifficulty(d);
-      setTimeout(() => resetTest(false), 0);
+      difficultyRef.current = d;
+      resetTest(false);
     },
     [resetTest]
   );
 
   const handlePunctuationToggle = useCallback(() => {
-    setPunctuation((prev) => {
-      setTimeout(() => resetTest(false), 0);
-      return !prev;
-    });
+    const next = !punctuationRef.current;
+    setPunctuation(next);
+    punctuationRef.current = next;
+    resetTest(false);
   }, [resetTest]);
 
   const handleNumbersToggle = useCallback(() => {
-    setNumbers((prev) => {
-      setTimeout(() => resetTest(false), 0);
-      return !prev;
-    });
+    const next = !numbersRef.current;
+    setNumbers(next);
+    numbersRef.current = next;
+    resetTest(false);
   }, [resetTest]);
 
   const handleClearBests = useCallback(() => {
