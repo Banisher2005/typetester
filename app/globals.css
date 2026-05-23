@@ -358,13 +358,19 @@ body {
 .word-current { border-bottom: 2px solid var(--cursor); padding-bottom: 1px; }
 .word-incorrect-done { border-bottom: 2px solid var(--error); }
 
-/* Hidden input */
+/* Hidden input — uses clip instead of pointer-events:none so .focus() always works */
 .hidden-input {
-  position: absolute;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
   opacity: 0;
-  pointer-events: none;
-  width: 1px; height: 1px;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
   overflow: hidden;
+  /* DO NOT set pointer-events:none — browser blocks .focus() on such elements */
 }
 
 /* ════════════════════════════════════════════════════════════════════

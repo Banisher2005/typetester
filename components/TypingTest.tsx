@@ -631,6 +631,12 @@ export default function TypingTest() {
               value={currentInput}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
+              onBlur={() => {
+                // Re-focus immediately if the test is running — never let focus escape
+                if (phaseRef.current === "running") {
+                  requestAnimationFrame(() => inputRef.current?.focus());
+                }
+              }}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
