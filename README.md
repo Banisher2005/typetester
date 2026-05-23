@@ -14,39 +14,61 @@
 
 ---
 
-## 📸 Preview
-
-| Dark Mode | Results Screen |
-|-----------|---------------|
-| ![Dark Mode](https://placehold.co/480x260/1a1a1a/f0c040?text=TypeTester+Dark) | ![Results](https://placehold.co/480x260/242424/4caf50?text=Results+%E2%80%94+WPM+%2B+Graph) |
-
-> **No login. No sign-up. No account.** Open the app and start typing.
+> **No login. No sign-up. No account.** Open the app and start typing immediately.
 
 ---
 
 ## ✨ Features
 
-- **Two test modes**
-  - ⏱ **Time** — 15 / 30 / 60 / 120 second countdown
-  - 📝 **Words** — 10 / 25 / 50 / 100 fixed word count
-- **Real-time character highlighting** — correct chars turn green, incorrect turn red, blinking cursor on the current position
-- **3-line word window** that smoothly scrolls as you advance through words
-- **Live stats bar** — WPM, accuracy %, and timer/words-remaining update every 250 ms
-- **Results screen** with:
+### Test Modes
+| Mode | Options |
+|------|---------|
+| ⏱ **Time** | 15s / 30s / 60s / 120s countdown |
+| 📝 **Words** | 10 / 25 / 50 / 100 fixed word count |
+
+### Difficulty & Word Options
+- 🟢 **Easy** / 🟡 **Medium** / 🔴 **Hard** — controls word complexity
+- **Punctuation** toggle — adds commas, periods, apostrophes
+- **Numbers** toggle — mixes in numeric values
+
+### Typing Experience
+- Real-time **character highlighting** — correct = green, incorrect = red, blinking cursor on current position
+- **3-line word window** — only 3 rows visible at a time, scrolls smoothly as you type
+- **Focus mode** — UI fades away while you're typing so nothing distracts you
+- **CapsLock warning** — floating pill appears if CapsLock is on
+- **Sound effects** — subtle audio feedback on correct / incorrect keypresses (toggle in header)
+- Input focus is **auto-recovered** — can never get stuck unfocused during a test
+
+### Stats & Results
+- **Live stats bar** — WPM, accuracy %, countdown / words remaining (updates every 250ms)
+- **Results screen** showing:
   - Large WPM display
-  - Raw WPM, accuracy, correct/incorrect keystrokes, time taken
-  - SVG WPM-over-time line chart (zero dependencies)
-- **Keyboard shortcuts** — `Tab + Enter` to restart, `Esc` to refocus
-- **Light / Dark theme** toggle, saved to `localStorage`
+  - Raw WPM, accuracy %, correct / incorrect keystrokes, time taken
+  - 🏆 **New personal best badge** with glow animation
+  - SVG WPM-over-time line chart (no library — pure `<polyline>`)
+- **Best scores** saved per mode + option to `localStorage`
+
+### Customisation
+- **10 colour themes** — Dark, Light, Serika, Botanical, Carbon, Mocha, Ocean, Rosé, Lavender, Cream
+- Quick **dark ↔ light toggle** in header
+- All preferences (theme, sound) saved to `localStorage`
 - **Monospace font** — Roboto Mono via Google Fonts
-- Fully **static** — no server, no database, no auth
+
+### Keyboard Shortcuts
+| Shortcut | Action |
+|----------|--------|
+| `Tab` + `Enter` | Restart the test |
+| `Esc` | Re-focus the typing area |
+| `Space` | Advance to next word |
+| `Backspace` | Delete within current word only |
+
+> Backspace will **not** go back to a previous word.
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - [Node.js](https://nodejs.org/) ≥ 18
 - npm (comes with Node)
 
@@ -54,7 +76,7 @@
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Banisher2005/typertester.git
+git clone https://github.com/Banisher2005/typetester.git
 cd typetester
 
 # 2. Install dependencies
@@ -70,18 +92,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📦 Deploy to Vercel
 
-The fastest way:
-
 1. Click the **Deploy** button at the top of this README, **or**
-2. Do it manually:
+2. Push to GitHub → go to [vercel.com/new](https://vercel.com/new) → import the repo → click **Deploy**
 
-```bash
-# Push to GitHub (already done ✓)
-# Then go to https://vercel.com/new and import your repository
-# Vercel auto-detects Next.js — click Deploy, done.
-```
-
-No `vercel.json` needed. No environment variables. It just works.
+No `vercel.json`. No environment variables. Vercel auto-detects Next.js and it just works.
 
 ---
 
@@ -90,23 +104,26 @@ No `vercel.json` needed. No environment variables. It just works.
 ```
 typetester/
 ├── app/
-│   ├── layout.tsx          # Root layout — Roboto Mono font, meta tags
-│   ├── page.tsx            # Entry page — renders <TypingTest />
-│   └── globals.css         # CSS custom properties, component styles, animations
+│   ├── layout.tsx            # Root layout — Roboto Mono font, page metadata
+│   ├── page.tsx              # Entry page — renders <TypingTest />
+│   └── globals.css           # CSS custom properties, 10 themes, all component styles
 │
 ├── components/
-│   ├── TypingTest.tsx      # Main state machine (idle → running → finished)
-│   ├── WordDisplay.tsx     # 3-line windowed word renderer with char highlighting
-│   ├── StatsBar.tsx        # Live WPM / accuracy / countdown bar
-│   ├── ResultsScreen.tsx   # Post-test summary + SVG WPM graph
-│   └── ModeSelector.tsx    # Time / Words mode tabs + sub-option buttons
+│   ├── TypingTest.tsx        # Main state machine (idle → running → finished)
+│   ├── WordDisplay.tsx       # 3-line windowed word renderer with char highlighting
+│   ├── StatsBar.tsx          # Live WPM / accuracy / countdown bar
+│   ├── ResultsScreen.tsx     # Post-test summary + SVG WPM graph + best score badge
+│   ├── ModeSelector.tsx      # Time/Words/Difficulty/Punctuation/Numbers controls
+│   ├── ThemePicker.tsx       # Colour theme dropdown with swatch grid
+│   └── CapsLockWarning.tsx   # Floating CapsLock pill indicator
 │
 ├── lib/
-│   ├── words.ts            # 300-word pool + Fisher-Yates shuffle
-│   └── stats.ts            # WPM, raw WPM, accuracy calculations
+│   ├── words.ts              # Word pool + Fisher-Yates shuffle + difficulty/punct/nums filters
+│   ├── stats.ts              # calcWPM(), calcRawWPM(), calcAccuracy()
+│   ├── bestScores.ts         # localStorage best score read/write helpers
+│   └── sounds.ts             # SoundManager — Web Audio API click sounds
 │
 ├── next.config.ts
-├── tailwind.config.ts
 ├── tsconfig.json
 └── package.json
 ```
@@ -121,34 +138,24 @@ typetester/
 | **Raw WPM** | `(totalChars / 5) / (elapsedSeconds / 60)` |
 | **Accuracy** | `(correctChars / totalChars) × 100` |
 
-The WPM graph records one data point per second tick and renders as an SVG `<polyline>` — no charting library required.
+The WPM graph samples one data point per second and renders as a pure SVG `<polyline>` — no charting library needed.
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## 🎨 Themes
 
-| Shortcut | Action |
-|----------|--------|
-| `Tab` + `Enter` | Restart the current test |
-| `Esc` | Focus the typing area |
-| `Space` | Advance to the next word |
-| `Backspace` | Delete within the current word |
-
-> Backspace will **not** go back to a previous word.
-
----
-
-## 🎨 Design Tokens
-
-| Token | Dark | Light |
-|-------|------|-------|
-| Background | `#1a1a1a` | `#f5f5f5` |
-| Text | `#e2e2e2` | `#1a1a1a` |
-| Correct | `#4caf50` | `#2e7d32` |
-| Incorrect | `#f44336` | `#c62828` |
-| Cursor / Accent | `#f0c040` | `#d97706` |
-
-Theme preference is saved in `localStorage` under the key `typetester-theme`.
+| Theme | Style |
+|-------|-------|
+| **Dark** | Classic dark — `#1a1a1a` background, amber accent |
+| **Light** | Clean white — `#f5f5f5` background |
+| **Serika** | MonkeyType's signature dark + yellow |
+| **Carbon** | GitHub dark palette, blue accent |
+| **Mocha** | Catppuccin Mocha — deep purple, pink accent |
+| **Ocean** | Deep navy, cyan accent |
+| **Botanical** | Dark forest green |
+| **Rosé** | Deep purple-black, pink accent |
+| **Lavender** | Dark + lavender-blue accent |
+| **Cream** | Rosé Pine Dawn — warm cream, dusty rose |
 
 ---
 
@@ -158,11 +165,13 @@ Theme preference is saved in `localStorage` under the key `typetester-theme`.
 |-------|-----------|
 | Framework | [Next.js 16](https://nextjs.org/) — App Router |
 | Language | [TypeScript 5](https://www.typescriptlang.org/) |
-| Styling | [Tailwind CSS v4](https://tailwindcss.com/) + vanilla CSS vars |
+| Styling | [Tailwind CSS v4](https://tailwindcss.com/) + CSS custom properties |
 | State | React hooks only (`useState`, `useRef`, `useCallback`, `useEffect`) |
+| Audio | Web Audio API — no library |
 | Font | [Roboto Mono](https://fonts.google.com/specimen/Roboto+Mono) via `next/font/google` |
 | Charts | Plain SVG `<polyline>` — zero dependencies |
-| Deployment | [Vercel](https://vercel.com/) |
+| Storage | `localStorage` — theme, sound, best scores |
+| Deployment | [Vercel](https://vercel.com/) — zero config |
 
 ---
 
